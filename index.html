@@ -1,145 +1,111 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>three.js webgl - custom attributes [particles]</title>
+    <title>three.js webgl - particles - sprites</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
     <link type="text/css" rel="stylesheet" href="packages/three/css/main.css">
+    <link type="text/css" rel="stylesheet" href="packages/fake-terminal/css/main.css">
+
+
 </head>
-
 <body>
+
 <div id="container">
-
+    <div id="output"></div>
+    <div id="input-line" class="input-line">
+        <div id="prompt" class="prompt-color"></div>&nbsp;
+        <div>
+            <input type="text" id="cmdline" autocomplete="on" autocorrect="on" autocapitalize="on" spellcheck="on"
+                   autofocus/>
+        </div>
+    </div>
 </div>
-
-
-<script type="x-shader/x-vertex" id="vertexshader">
-
-			attribute float size;
-			attribute vec3 customColor;
-
-			varying vec3 vColor;
-
-			void main() {
-
-				vColor = customColor;
-
-				vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
-
-				gl_PointSize = size * ( 300.0 / -mvPosition.z );
-
-				gl_Position = projectionMatrix * mvPosition;
-
-			}
-
-		</script>
-
-<script type="x-shader/x-fragment" id="fragmentshader">
-
-			uniform vec3 color;
-			uniform sampler2D pointTexture;
-
-			varying vec3 vColor;
-
-			void main() {
-
-				gl_FragColor = vec4( color * vColor, 1.0 );
-				gl_FragColor = gl_FragColor * texture2D( pointTexture, gl_PointCoord );
-
-			}
-
-		</script>
 
 <script type="module">
 
     import * as THREE from './packages/three/js/build/three.module.js';
 
-    let renderer, scene, camera, stats;
+    let camera, scene, renderer, parameters;
+    let mouseX = 0, mouseY = 0;
 
-    let sphere;
+    let windowHalfX = window.innerWidth / 2;
+    let windowHalfY = window.innerHeight / 2;
 
-    const WIDTH = window.innerWidth;
-    const HEIGHT = window.innerHeight;
+    const materials = [];
 
     init();
     animate();
 
     function init() {
 
-        camera = new THREE.PerspectiveCamera( 40, WIDTH / HEIGHT, 1, 10000 );
-        camera.position.z = 300;
+        camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 1, 2000 );
+        camera.position.z = 1000;
 
         scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2( 0x000000, 0.0008 );
 
-        const amount = 100000;
-        const radius = 200;
+        const geometry = new THREE.BufferGeometry();
+        const vertices = [];
 
-        const positions = new Float32Array( amount * 3 );
-        const colors = new Float32Array( amount * 3 );
-        const sizes = new Float32Array( amount );
+        const textureLoader = new THREE.TextureLoader();
 
-        const vertex = new THREE.Vector3();
-        const color = new THREE.Color( 0xffffff );
+        const sprite1 = textureLoader.load( 'packages/three/textures/snowflake1.png' );
+        const sprite2 = textureLoader.load( 'packages/three/textures/snowflake2.png' );
+        const sprite3 = textureLoader.load( 'packages/three/textures/snowflake3.png' );
+        const sprite4 = textureLoader.load( 'packages/three/textures/snowflake4.png' );
+        const sprite5 = textureLoader.load( 'packages/three/textures/snowflake5.png' );
 
-        for ( let i = 0; i < amount; i ++ ) {
+        for ( let i = 0; i < 10000; i ++ ) {
 
-            vertex.x = ( Math.random() * 2 - 1 ) * radius;
-            vertex.y = ( Math.random() * 2 - 1 ) * radius;
-            vertex.z = ( Math.random() * 2 - 1 ) * radius;
-            vertex.toArray( positions, i * 3 );
+            const x = Math.random() * 2000 - 1000;
+            const y = Math.random() * 2000 - 1000;
+            const z = Math.random() * 2000 - 1000;
 
-            if ( vertex.x < 0 ) {
-
-                color.setHSL( 0.5 + 0.1 * ( i / amount ), 0.7, 0.5 );
-
-            } else {
-
-                color.setHSL( 0.0 + 0.1 * ( i / amount ), 0.9, 0.5 );
-
-            }
-
-            color.toArray( colors, i * 3 );
-
-            sizes[ i ] = 10;
+            vertices.push( x, y, z );
 
         }
 
-        const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute( 'position', new THREE.BufferAttribute( positions, 3 ) );
-        geometry.setAttribute( 'customColor', new THREE.BufferAttribute( colors, 3 ) );
-        geometry.setAttribute( 'size', new THREE.BufferAttribute( sizes, 1 ) );
+        geometry.setAttribute( 'position', new THREE.Float32BufferAttribute( vertices, 3 ) );
 
-        //
+        parameters = [
+            [[ 1.0, 0.2, 0.5 ], sprite2, 20 ],
+            [[ 0.95, 0.1, 0.5 ], sprite3, 15 ],
+            [[ 0.90, 0.05, 0.5 ], sprite1, 10 ],
+            [[ 0.85, 0, 0.5 ], sprite5, 8 ],
+            [[ 0.80, 0, 0.5 ], sprite4, 5 ]
+        ];
 
-        const material = new THREE.ShaderMaterial( {
+        for ( let i = 0; i < parameters.length; i ++ ) {
 
-            uniforms: {
-                color: { value: new THREE.Color( 0xffffff ) },
-                pointTexture: { value: new THREE.TextureLoader().load( "./packages/three/textures/spark1.png" ) }
-            },
-            vertexShader: document.getElementById( 'vertexshader' ).textContent,
-            fragmentShader: document.getElementById( 'fragmentshader' ).textContent,
+            const color = parameters[ i ][ 0 ];
+            const sprite = parameters[ i ][ 1 ];
+            const size = parameters[ i ][ 2 ];
 
-            blending: THREE.AdditiveBlending,
-            depthTest: false,
-            transparent: true
+            materials[ i ] = new THREE.PointsMaterial( { size: size, map: sprite, blending: THREE.AdditiveBlending, depthTest: false, transparent: true } );
+            materials[ i ].color.setHSL( color[ 0 ], color[ 1 ], color[ 2 ] );
 
-        } );
+            const particles = new THREE.Points( geometry, materials[ i ] );
 
-        //
+            particles.rotation.x = Math.random() * 6;
+            particles.rotation.y = Math.random() * 6;
+            particles.rotation.z = Math.random() * 6;
 
-        sphere = new THREE.Points( geometry, material );
-        scene.add( sphere );
+            scene.add( particles );
+
+        }
 
         //
 
         renderer = new THREE.WebGLRenderer();
         renderer.setPixelRatio( window.devicePixelRatio );
-        renderer.setSize( WIDTH, HEIGHT );
+        renderer.setSize( window.innerWidth, window.innerHeight );
+        document.body.appendChild( renderer.domElement );
 
-        const container = document.getElementById( 'container' );
-        container.appendChild( renderer.domElement );
+        //
 
+        document.body.style.touchAction = 'none';
+        // document.body.addEventListener( 'pointermove', onPointerMove );
 
         //
 
@@ -149,6 +115,9 @@
 
     function onWindowResize() {
 
+        windowHalfX = window.innerWidth / 2;
+        windowHalfY = window.innerHeight / 2;
+
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
 
@@ -156,30 +125,53 @@
 
     }
 
+    function onPointerMove( event ) {
+
+        if ( event.isPrimary === false ) return;
+
+        mouseX = event.clientX - windowHalfX;
+        mouseY = event.clientY - windowHalfY;
+
+    }
+
+    //
+
     function animate() {
 
         requestAnimationFrame( animate );
 
         render();
-
     }
 
     function render() {
 
-        const time = Date.now() * 0.005;
+        const time = Date.now() * 0.00005;
 
-        sphere.rotation.z = 0.01 * time;
+        camera.position.x += ( mouseX - camera.position.x ) * 0.05;
+        camera.position.y += ( - mouseY - camera.position.y ) * 0.05;
 
-        const geometry = sphere.geometry;
-        const attributes = geometry.attributes;
+        camera.lookAt( scene.position );
 
-        for ( let i = 0; i < attributes.size.array.length; i ++ ) {
+        for ( let i = 0; i < scene.children.length; i ++ ) {
 
-            attributes.size.array[ i ] = 14 + 13 * Math.sin( 0.1 * i + time );
+            const object = scene.children[ i ];
+
+            if ( object instanceof THREE.Points ) {
+
+                object.rotation.y = time * ( i < 4 ? i + 1 : - ( i + 1 ) );
+
+            }
 
         }
 
-        attributes.size.needsUpdate = true;
+        for ( let i = 0; i < materials.length; i ++ ) {
+
+            const color = parameters[ i ][ 0 ];
+
+            const h = ( 360 * ( color[ 0 ] + time ) % 360 ) / 360;
+            materials[ i ].color.setHSL( h, color[ 1 ], color[ 2 ] );
+
+        }
 
         renderer.render( scene, camera );
 
@@ -187,6 +179,8 @@
 
 </script>
 
-</body>
+<script src="packages/fake-terminal/js/main.js"></script>
+<script src="packages/fake-terminal/js/polyfill.js"></script>
 
+</body>
 </html>
